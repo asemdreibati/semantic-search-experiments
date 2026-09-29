@@ -1,0 +1,4 @@
+models/
+data/*.npy
+__pycache__/
+data/*.log

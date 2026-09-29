@@ -1,3 +1,5 @@
+import os
+
 import requests
 
 # ============================================================
@@ -6,8 +8,8 @@ import requests
 
 SEARCH_URL = "http://34.196.113.253:8000/v1/query/search"
 
-# TODO: put your real bearer token here
-API_TOKEN = "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICI2SS02UWMxbkkxQUt0c3R6UUNQRnFRSnN1cEREWDVCdHRiNHpMckhMUGJZIn0.eyJleHAiOjE4MjE0NDkyNjcsImlhdCI6MTc4OTkxMzI2NywianRpIjoiY2ZiMTliMjUtOWRkNS00NDVmLWIyNmEtN2E2MzkyMjkyNmNlIiwiaXNzIjoiaHR0cDovLzMyLjE5OS4yMzkuMTcwL2F1dGgvcmVhbG1zL3dhcmVkIiwic3ViIjoiNDQ3NTZjYTAtY2JlOC00YWRjLTkxNjQtNDgyZTE4NjUyYzhlIiwidHlwIjoiQmVhcmVyIiwiYXpwIjoiY3RzLXdlYiIsInNlc3Npb25fc3RhdGUiOiJmMjk3MGEwMC01NjI4LTQ4MWMtODQyNy05ZjIyZmQzOWIxYTIiLCJhbGxvd2VkLW9yaWdpbnMiOlsiKiJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsiZGVmYXVsdC1yb2xlcy13YXJlZC0xIl19LCJzY29wZSI6InByb2ZpbGUgZW1haWwiLCJzaWQiOiJmMjk3MGEwMC01NjI4LTQ4MWMtODQyNy05ZjIyZmQzOWIxYTIiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiLZhdmI2LjZgSDYp9mE2KfYqti12KfZhNin2KoiLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJrYWNzdC1jdHMiLCJsb2NhbGUiOiJhciIsImdpdmVuX25hbWUiOiLZhdmI2LjZgSDYp9mE2KfYqti12KfZhNin2KoiLCJmYW1pbHlfbmFtZSI6IiJ9.bCgNw_HCQUXq3v_NOk0IViNdAnPW6lw_JSAZyQN64iveN81o_q7UDFYiKJcnxI3FPxNLbAnp4Fu6BKr6ncAl61vIBfT07bHCV82P-2rRSDlhnMOVB9VNFmV921uqjLHgrTRurpR26U3YYRZjnDHUgMq24UBJjBemDtHiEGJCc3DQkAyMrGOkBr2-N8LJuORT9p4q75aKVWeFuRIfF3cLYSC6vsRVXrpZNfy81Axsij_TfrVUhgn5QDLuIuHx8nFJ0oZCOgpaV2Wfs81XnwY7EaAil7pVq6jEraoIVp8L46sH_jjMZIMe8FQ2OFMt2JWB0GWKxiZiJUP1Uuor9XPxXg"
+# Never commit tokens: export SEARCH_API_TOKEN=... before running.
+API_TOKEN = os.environ["SEARCH_API_TOKEN"]
 
 HEADERS = {
     "Authorization": f"Bearer {API_TOKEN}",
