@@ -81,6 +81,35 @@ question ──normalise──► e5 "query: " ──► cosine top-k ──► 
    answer above T_high, refuse below T_low, send the band between them to
    the judge.
 
+### Why every cosine is ~0.8, and what removing that does (`calibration.py`)
+
+The e5 vectors are **anisotropic**: the mean of all chunk vectors has
+norm 0.91, so ~91% of every vector is one shared direction. Two chunks
+from unrelated documents have a median cosine of 0.81, and "طريقة تحضير
+القهوة العربية" scores 0.78 against the regulations.
+
+Subtracting each space's mean before the cosine fixes the *scale*. The
+query mean comes from 40 unrelated background questions, not the test
+set.
+
+| best-chunk score | raw cosine | centered |
+|---|---|---|
+| answerable (57) | 0.78 – 0.90 | 0.16 – **0.35** (median) – 0.58 |
+| hard negatives (12) | 0.77 – 0.82 | 0.12 – **0.19** – 0.25 |
+| garbage (4) | 0.74 – 0.79 | 0.11 – **0.11** – 0.20 |
+
+It does **not** fix the *separation*. AUC is 0.977 centered vs 0.973
+raw, and CV accuracy is 89.0% vs 91.8%. Dropping principal components,
+whitening, BM25, and BM25 combined with the cosine all do worse (see
+`calibration.md`). The questions still mis-decided are the same ones.
+They are not caused by the high number but by the bi-encoder itself: one
+vector per chunk measures *topic*, not *"does this passage answer this
+question"*. "حد السرعة على الطرق السريعة" is on-topic for the roads
+regulation but unanswered. "عطل تقني أثناء الحصة الافتراضية" is answered
+in different words ("المشكلات التقنية الطارئة أثناء التدريس"). Closing
+that gap needs a model that reads the question and the passage
+**together**: a cross-encoder reranker or an LLM judge (step 5 above).
+
 ### What each choice is worth (ablation, same 73 questions)
 
 | variant | doc #1 | answer/no-answer decision (CV) |
@@ -108,7 +137,7 @@ question ──normalise──► e5 "query: " ──► cosine top-k ──► 
 ## Running it
 
 ```bash
-pip install pymupdf onnxruntime tokenizers numpy requests
+pip install pymupdf onnxruntime tokenizers numpy requests scikit-learn
 apt-get install tesseract-ocr tesseract-ocr-ara
 # model (≈1.3 GB):
 mkdir -p models && curl -L https://storage.googleapis.com/qdrant-fastembed/fast-multilingual-e5-large.tar.gz | tar xz -C models
@@ -117,6 +146,7 @@ python extract.py        # OCR → data/pages.jsonl (committed, so optional)
 python build_index.py    # chunks + embeddings (3 variants)
 python evaluate.py       # → results_title_prefix.md
 python evaluate.py no_e5_prefix   # ablations
+python calibration.py            # anisotropy treatments → calibration.md
 SEARCH_API_TOKEN=... python qa_live_api.py   # same test set against the live API
 ```
 

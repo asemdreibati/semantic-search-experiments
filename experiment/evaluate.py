@@ -46,7 +46,11 @@ def score_queries(variant):
     tests = json.loads((HERE / "testset.json").read_text(encoding="utf-8"))
     q = E5().queries([normalize(t["query"]) for t in tests],
                      prefix=variant != "no_e5_prefix")
-    sims = q @ emb.T
+    return rows_from_sims(tests, q @ emb.T, chunks)
+
+
+def rows_from_sims(tests, sims, chunks):
+    """Rank chunks per query by `sims` (queries x chunks), collapse to docs."""
     docs = sorted({c["doc"] for c in chunks})
     doc_idx = np.array([docs.index(c["doc"]) for c in chunks])
     rows = []
