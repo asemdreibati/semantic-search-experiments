@@ -9,17 +9,24 @@ The pipeline here runs end-to-end on the 7 PDFs and is evaluated on 73
 questions: 57 answerable and 16 unanswerable, of which 12 are hard
 negatives like "حد السرعة على الطرق السريعة" or "عقوبة تسريب البيانات الشخصية".
 
-| | Majd's run (live API) | e5 cosine threshold | **e5 + reranker** |
-|---|---|---|---|
-| correct document ranked #1 | 0 / 33 counted (see below) | 57 / 57 (100%) | **57 / 57 (100%)** |
-| expected evidence in top-5 chunks | – | 93.0% | **96.5%** |
-| answerable → answered from right doc (cross-validated) | – | 91.2% | **98.2%** |
-| unanswerable → "no relevant info" (cross-validated) | 4 / 4 "pass" (not real, see below) | 93.8% | **93.8%** |
-| **overall (cross-validated)** | 10.8% | 91.8% | **97.3%** |
-| separation of answerable vs unanswerable (AUC) | – | 0.973 | **0.995** |
+**The production system embeds with `BAAI/bge-m3`.** This was identified
+from the vector Nuxeo sends to Elastic (see
+[Which model production uses](#which-embedding-model-production-uses)),
+so the experiment was rerun with it. The columns below use the same OCR,
+chunks and test set.
 
-Per-query details: [`results_rerank.md`](results_rerank.md) (with reranker),
-[`results_title_prefix.md`](results_title_prefix.md) (cosine only).
+| | Majd's run (live API) | e5 cosine | **bge-m3 cosine** | e5 + reranker | **bge-m3 + reranker** |
+|---|---|---|---|---|---|
+| correct document ranked #1 | 0 / 33 counted (see below) | 100% | **100%** | 100% | **100%** |
+| expected evidence in top-5 chunks | – | 93.0% | 89.5% | 96.5% | **94.7%** |
+| answerable → answered from right doc (CV) | – | 91.2% | 93.0% | 98.2% | **98.2%** |
+| unanswerable → "no relevant info" (CV) | 4 / 4 "pass" (not real, see below) | 93.8% | 93.8% | 93.8% | **93.8%** |
+| **overall (CV)** | 10.8% | 91.8% | **93.2%** | 97.3% | **97.3%** |
+| AUC answerable vs unanswerable | – | 0.973 | 0.984 | 0.995 | – |
+
+Per-query details: [`results_rerank_bge_m3.md`](results_rerank_bge_m3.md),
+[`results_bge_m3.md`](results_bge_m3.md), [`results_rerank.md`](results_rerank.md),
+[`results_title_prefix.md`](results_title_prefix.md).
 
 ## Why Majd's experiment failed
 
@@ -42,10 +49,11 @@ Findings from `QA result.rb`, the QA script and the Elastic query:
    says which position a hit is in, not how similar it is. A coffee recipe
    and an exact match both score 1/61, so **no threshold on these scores
    can ever say "no relevant info"**.
-4. **The Elastic `min_score: 0.7` filters nothing.** For a cosine `knn`
-   query Elastic scores `(1 + cos) / 2`, so 0.7 means cos ≥ 0.4. Modern
-   embedding models put *every* Arabic sentence pair above that. The
-   calibrated cut-off here is cos ≈ 0.82, which is ≈ 0.91 in Elastic score.
+4. **The Elastic `min_score: 0.7` filters almost nothing.** For a cosine
+   `knn` query Elastic scores `(1 + cos) / 2`, so 0.7 means cos ≥ 0.4.
+   With bge-m3, 13 of the 16 unanswerable test questions reach that on
+   their best chunk ("car engine" scores cos 0.46). The calibrated bge-m3
+   cut-off is cos ≈ 0.51, which is **≈ 0.755 in Elastic score**.
 5. **The negative tests could not fail.** A negative "passed" when the top
    hit was not one of the 4 stale UUIDs, which was always true. In fact
    every garbage query returned 8 hits; "car engine overheating" ranked
@@ -57,8 +65,8 @@ Findings from `QA result.rb`, the QA script and the Elastic query:
 ## The method (what to do)
 
 ```
-PDF ──OCR (ara)──► normalise ──► chunk ~800 chars + doc title ──► e5 "passage: " ──► index
-question ──normalise──► e5 "query: " ──► cosine top-20 ──► bge-reranker-v2-m3 reads (question, chunk)
+PDF ──OCR (ara)──► normalise ──► chunk ~800 chars + doc title ──► bge-m3 ──► index
+question ──normalise──► bge-m3 ──► cosine top-20 ──► bge-reranker-v2-m3 reads (question, chunk)
          ──► best reranker score ≥ T ? answer from that chunk : "لا توجد معلومات"
 ```
 
@@ -68,10 +76,10 @@ question ──normalise──► e5 "query: " ──► cosine top-20 ──►
    tatweel and bidi marks (`textnorm.py`).
 2. **Chunk with context.** Use chunks of about 800 characters with one
    paragraph of overlap, each prefixed with its document title.
-3. **Use the embedding model the way it was trained.**
-   `multilingual-e5-large` (1024-d, same size as the vectors in the Nuxeo
-   query) needs the `query: ` and `passage: ` prefixes.
-4. **Use e5 for retrieval, not for the final decision.** A threshold on
+3. **Use the embedding model the way it was trained.** Production uses
+   `BAAI/bge-m3`, which takes no prefixes. With `multilingual-e5-large`,
+   the `query: ` and `passage: ` prefixes are required.
+4. **Use the embedding for retrieval, not for the final decision.** A threshold on
    the raw cosine of the best chunk reaches 91.8%. Pick the threshold on labelled questions, including hard
    negatives, and measure it with cross-validation, never by guessing.
    Relative scores such as z-score or top-1 minus mean were tested and
@@ -105,6 +113,29 @@ question ──normalise──► e5 "query: " ──► cosine top-20 ──►
    - An LLM that answers only from the retrieved chunks, and says "لا توجد
      معلومات ذات صلة في الوثائق" otherwise, is a further safety net. It
      has not been tested here.
+
+### Which embedding model production uses (`identify_model.py`)
+
+No file names the model. The only evidence is the `query_vector` in the
+Elastic query: 1024-d, unit norm, and every value exactly representable
+in float16 (served in half precision). Every model puts its vectors in a
+narrow cone around its own mean direction, and a vector from another model
+has no reason to lie in that cone. Each 1024-d multilingual candidate
+embedded 40 generic Arabic questions:
+
+| candidate | its own vectors · its mean | Nuxeo vector · its mean |
+|---|---|---|
+| multilingual-e5-large (with / without `query:`) | 0.83 – 0.90 | 0.27 / 0.26 |
+| multilingual-e5-large-instruct | 0.86 – 0.91 | 0.22 |
+| **BAAI/bge-m3** | **0.53 – 0.63** | **0.52** |
+| snowflake-arctic-embed-l-v2.0 | 0.23 – 0.52 | 0.17 / 0.12 |
+| Qwen3-Embedding-0.6B | 0.24 – 0.64 | −0.03 |
+
+Confirmation: in bge-m3 space the Nuxeo vector's 5 nearest test questions
+are *all* about stopping a factory production line (cos 0.58–0.74, median
+over all questions 0.36). So it is the bge-m3 embedding of a user prompt on
+that topic. In e5 space its nearest neighbour is only 0.41 and
+meaningless. bge-m3 takes no `query:`/`passage:` prefixes.
 
 ### Why every cosine is ~0.8, and what removing that does (`calibration.py`)
 
@@ -151,11 +182,12 @@ that gap needs a model that reads the question and the passage
   rank fusion. RRF scores cannot be thresholded.
 - Add a reranker stage (`bge-reranker-v2-m3`) on the top-20 hits, and
   decide "no relevant info" on its score, not on the cosine or RRF.
-- Replace `min_score: 0.7` with a calibrated value. Start near 0.91 in
-  Elastic score (cos 0.82) for e5-large with prefixes, then recalibrate
-  with `evaluate.py` for whatever model Nuxeo actually uses.
-- Make sure the embedding service adds the `query: ` / `passage: `
-  prefixes if the model is e5.
+- If the cosine alone gates, replace `min_score: 0.7` with the bge-m3
+  value: about **0.755** in Elastic score (cos 0.51). Recalibrate with
+  `evaluate.py bge_m3` once the test set grows.
+- Keep bge-m3, which retrieves as well as or better than e5 here, and
+  prepend the document title to each chunk before embedding. Without the
+  title, bge-m3 drops from 93.2% to 90.4% (`bge_m3_no_title`).
 - Scope the experiment to the 7 documents, with a filter or a clean
   index, and refresh the doc IDs.
 - Then run `qa_live_api.py` against the API. Its negatives pass only when
@@ -165,7 +197,7 @@ that gap needs a model that reads the question and the passage
 
 ```bash
 pip install pymupdf onnxruntime tokenizers numpy requests scikit-learn
-pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install transformers sentencepiece
+pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install transformers sentencepiece sentence-transformers
 apt-get install tesseract-ocr tesseract-ocr-ara
 # model (≈1.3 GB):
 mkdir -p models && curl -L https://storage.googleapis.com/qdrant-fastembed/fast-multilingual-e5-large.tar.gz | tar xz -C models
@@ -176,6 +208,10 @@ python evaluate.py       # → results_title_prefix.md
 python evaluate.py no_e5_prefix   # ablations
 python calibration.py            # anisotropy treatments → calibration.md
 python rerank.py                 # reranker stage → results_rerank.md (scores cached in data/rerank_scores.json)
+# production model (bge-m3, needs sentence-transformers):
+python build_index.py bge_m3 bge_m3_no_title
+python evaluate.py bge_m3 && python rerank.py bge_m3 && python calibration.py bge_m3
+python identify_model.py         # fingerprint the Nuxeo query vector → identify_model.md
 SEARCH_API_TOKEN=... python qa_live_api.py   # same test set against the live API
 ```
 

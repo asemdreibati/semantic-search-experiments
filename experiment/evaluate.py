@@ -20,7 +20,7 @@ from pathlib import Path
 
 import numpy as np
 
-from embedder import E5
+from embedder import embedder_for
 from textnorm import normalize
 
 HERE = Path(__file__).resolve().parent
@@ -44,8 +44,8 @@ def score_queries(variant):
     chunks = [json.loads(l) for l in (DATA / "chunks.jsonl").open(encoding="utf-8")]
     emb = np.load(DATA / f"emb_{variant}.npy")
     tests = json.loads((HERE / "testset.json").read_text(encoding="utf-8"))
-    q = E5().queries([normalize(t["query"]) for t in tests],
-                     prefix=variant != "no_e5_prefix")
+    model, _, prefix = embedder_for(variant)
+    q = model.queries([normalize(t["query"]) for t in tests], prefix=prefix)
     return rows_from_sims(tests, q @ emb.T, chunks)
 
 

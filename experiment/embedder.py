@@ -51,3 +51,42 @@ class E5:
 
     def passages(self, texts, prefix=True):
         return self._embed([("passage: " if prefix else "") + t for t in texts])
+
+
+class BGEM3:
+    """BAAI/bge-m3 dense embeddings - the model the production system uses
+    (identified from the Nuxeo query vector, see identify_model.md).
+    bge-m3 takes no query/passage prefixes; `prefix` is accepted and ignored."""
+
+    def __init__(self, model_id=os.environ.get("BGE_M3_DIR", "BAAI/bge-m3")):
+        from sentence_transformers import SentenceTransformer
+        self.model = SentenceTransformer(model_id, device="cpu")
+
+    def _embed(self, texts):
+        return self.model.encode(texts, batch_size=8, normalize_embeddings=True,
+                                 convert_to_numpy=True).astype(np.float32)
+
+    def queries(self, texts, prefix=True):
+        return self._embed(texts)
+
+    def passages(self, texts, prefix=True):
+        return self._embed(texts)
+
+
+# variant name -> (model, prefix chunks with doc title, use e5 role prefixes)
+VARIANTS = {
+    "title_prefix": ("e5", True, True),        # e5 recommended setup
+    "no_title": ("e5", False, True),           # ablation
+    "no_e5_prefix": ("e5", True, False),       # ablation
+    "bge_m3": ("bge-m3", True, False),         # production model
+    "bge_m3_no_title": ("bge-m3", False, False),
+}
+_MODELS = {"e5": E5, "bge-m3": BGEM3}
+_loaded = {}
+
+
+def embedder_for(variant):
+    model, title, prefix = VARIANTS[variant]
+    if model not in _loaded:
+        _loaded[model] = _MODELS[model]()
+    return _loaded[model], title, prefix

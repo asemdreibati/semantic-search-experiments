@@ -11,11 +11,12 @@ The query-side mean comes from data/background_queries.json (40 generic
 questions, not in the test set), the chunk-side mean from the chunks, so
 no test label is used to fit any transform.
 
-Usage: python calibration.py   ->  prints a table, writes calibration.md
+Usage: python calibration.py [variant]   (default title_prefix = e5; bge_m3 = production model)
 """
 import json
 import math
 import re
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -23,7 +24,7 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 
 import evaluate as ev
-from embedder import E5
+from embedder import embedder_for
 from textnorm import normalize
 
 HERE = Path(__file__).resolve().parent
@@ -134,11 +135,13 @@ def combined_cv(rows_sem, bm_top, k=5, seed=0):
 def main():
     chunks = [json.loads(l) for l in (DATA / "chunks.jsonl").open(encoding="utf-8")]
     tests = json.loads((HERE / "testset.json").read_text(encoding="utf-8"))
-    C = np.load(DATA / "emb_title_prefix.npy")
-    e5 = E5()
-    Q = e5.queries([normalize(t["query"]) for t in tests])
-    bg = e5.queries([normalize(q) for q in
-                     json.loads((DATA / "background_queries.json").read_text(encoding="utf-8"))])
+    variant = sys.argv[1] if len(sys.argv) > 1 else "title_prefix"
+    C = np.load(DATA / f"emb_{variant}.npy")
+    model, _, prefix = embedder_for(variant)
+    Q = model.queries([normalize(t["query"]) for t in tests], prefix=prefix)
+    bg = model.queries([normalize(q) for q in
+                        json.loads((DATA / "background_queries.json").read_text(encoding="utf-8"))],
+                       prefix=prefix)
     mu_q, mu_c = bg.mean(0), C.mean(0)
 
     sims = {
@@ -181,8 +184,9 @@ def main():
         detail.append(f"| {g} | {min(a):.3f} / {np.median(a):.3f} / {max(a):.3f} | "
                       f"{min(b):.3f} / {np.median(b):.3f} / {max(b):.3f} |")
     print("\n".join(detail))
-    (HERE / "calibration.md").write_text(
-        "# Removing the shared direction (anisotropy) - results\n\n"
+    out = "calibration.md" if variant == "title_prefix" else f"calibration_{variant}.md"
+    (HERE / out).write_text(
+        f"# Removing the shared direction (anisotropy) - results, `{variant}`\n\n"
         "73 questions, same 5-fold CV protocol as evaluate.py.\n\n"
         + "\n".join(lines + detail) + "\n", encoding="utf-8")
 

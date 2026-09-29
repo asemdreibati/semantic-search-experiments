@@ -1,6 +1,6 @@
-# Results - e5 top-20 + bge-reranker-v2-m3
+# Results - `title_prefix` top-20 + bge-reranker-v2-m3
 
-| | e5 cosine only | + reranker |
+| | cosine only | + reranker |
 |---|---|---|
 | correct document ranked #1 | 100.0% | 100.0% |
 | evidence text in top-5 chunks | 93.0% | 96.5% |
@@ -20,7 +20,7 @@ Reranker threshold fitted on all queries: **0.0131**
 
 ## Per query
 
-| ok | expected doc | query | e5 cosine | reranker | top doc |
+| ok | expected doc | query | cosine | reranker | top doc |
 |---|---|---|---|---|---|
 | ✅ | السياسة الوطنية لتعزيز السلامة الإسعافية في الأماكن العامة ومقرات العمل لعام 1448هـ | ما هي المحاور الرئيسية للسياسة الوطنية للسلامة الإسعافية | 0.899 | 0.999 | السياسة الوطنية لتعزيز السلامة الإسعافية في الأماكن العامة ومقرات العمل لعام 1448هـ |
 | ✅ | السياسة الوطنية لتعزيز السلامة الإسعافية في الأماكن العامة ومقرات العمل لعام 1448هـ | ما المقصود بالأماكن العامة في سياسة السلامة الإسعافية | 0.896 | 0.999 | السياسة الوطنية لتعزيز السلامة الإسعافية في الأماكن العامة ومقرات العمل لعام 1448هـ |

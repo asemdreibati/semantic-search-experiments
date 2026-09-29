@@ -6,6 +6,7 @@ document title so that a chunk like "يعمل بهذا القرار من تار�
 carries what it belongs to.
 
 Output: data/chunks.jsonl, data/emb_<variant>.npy
+Usage: python build_index.py [variant ...]   (default: all, see embedder.VARIANTS)
 """
 import json
 import re
@@ -14,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from embedder import E5
+from embedder import VARIANTS, embedder_for
 
 DATA = Path(__file__).resolve().parent / "data"
 CHUNK_CHARS = 800
@@ -56,18 +57,12 @@ def main():
     for doc in by_doc:
         print(f"  {sum(c['doc'] == doc for c in chunks):4d} chunks  {doc}", file=sys.stderr)
 
-    e5 = E5()
-    variants = {
-        # the recommended setup
-        "title_prefix": ([f"{c['doc']}\n{c['text']}" for c in chunks], True),
-        # ablations, to show what each choice is worth
-        "no_title": ([c["text"] for c in chunks], True),
-        "no_e5_prefix": ([f"{c['doc']}\n{c['text']}" for c in chunks], False),
-    }
-    for name, (texts, prefix) in variants.items():
+    names = sys.argv[1:] or list(VARIANTS)
+    for name in names:
+        model, title, prefix = embedder_for(name)
+        texts = [f"{c['doc']}\n{c['text']}" if title else c["text"] for c in chunks]
         print(f"embedding {len(texts)} chunks [{name}]", file=sys.stderr)
-        np.save(DATA / f"emb_{name}.npy", e5.passages(texts, prefix=prefix))
-
+        np.save(DATA / f"emb_{name}.npy", model.passages(texts, prefix=prefix))
 
 if __name__ == "__main__":
     main()
