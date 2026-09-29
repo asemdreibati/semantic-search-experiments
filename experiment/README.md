@@ -9,14 +9,17 @@ The pipeline here runs end-to-end on the 7 PDFs and is evaluated on 73
 questions: 57 answerable and 16 unanswerable, of which 12 are hard
 negatives like "حد السرعة على الطرق السريعة" or "عقوبة تسريب البيانات الشخصية".
 
-| | Majd's run (live API) | this pipeline |
-|---|---|---|
-| correct document ranked #1 | 0 / 33 counted (see below) | **57 / 57 (100%)** |
-| expected evidence in top-5 chunks | – | 53 / 57 (93%) |
-| answerable → answered from right doc (cross-validated) | – | **91.2%** |
-| unanswerable → "no relevant info" (cross-validated) | 4 / 4 "pass" (not real, see below) | **93.8%** |
+| | Majd's run (live API) | e5 cosine threshold | **e5 + reranker** |
+|---|---|---|---|
+| correct document ranked #1 | 0 / 33 counted (see below) | 57 / 57 (100%) | **57 / 57 (100%)** |
+| expected evidence in top-5 chunks | – | 93.0% | **96.5%** |
+| answerable → answered from right doc (cross-validated) | – | 91.2% | **98.2%** |
+| unanswerable → "no relevant info" (cross-validated) | 4 / 4 "pass" (not real, see below) | 93.8% | **93.8%** |
+| **overall (cross-validated)** | 10.8% | 91.8% | **97.3%** |
+| separation of answerable vs unanswerable (AUC) | – | 0.973 | **0.995** |
 
-Per-query details: [`results_title_prefix.md`](results_title_prefix.md).
+Per-query details: [`results_rerank.md`](results_rerank.md) (with reranker),
+[`results_title_prefix.md`](results_title_prefix.md) (cosine only).
 
 ## Why Majd's experiment failed
 
@@ -55,7 +58,8 @@ Findings from `QA result.rb`, the QA script and the Elastic query:
 
 ```
 PDF ──OCR (ara)──► normalise ──► chunk ~800 chars + doc title ──► e5 "passage: " ──► index
-question ──normalise──► e5 "query: " ──► cosine top-k ──► best cosine ≥ T ? answer : "لا توجد معلومات"
+question ──normalise──► e5 "query: " ──► cosine top-20 ──► bge-reranker-v2-m3 reads (question, chunk)
+         ──► best reranker score ≥ T ? answer from that chunk : "لا توجد معلومات"
 ```
 
 1. **Extract text properly.** OCR every page with Tesseract `ara` at 300 dpi.
@@ -67,19 +71,40 @@ question ──normalise──► e5 "query: " ──► cosine top-k ──► 
 3. **Use the embedding model the way it was trained.**
    `multilingual-e5-large` (1024-d, same size as the vectors in the Nuxeo
    query) needs the `query: ` and `passage: ` prefixes.
-4. **Gate on the raw cosine of the best chunk, with a calibrated
-   threshold.** Pick the threshold on labelled questions, including hard
+4. **Use e5 for retrieval, not for the final decision.** A threshold on
+   the raw cosine of the best chunk reaches 91.8%. Pick the threshold on labelled questions, including hard
    negatives, and measure it with cross-validation, never by guessing.
    Relative scores such as z-score or top-1 minus mean were tested and
    separate worse (AUC 0.74–0.91 vs 0.97).
-5. **Add a second-stage judge for the grey zone.** e5 packs everything
-   into cos 0.78–0.86, and real answers and hard negatives overlap by
-   about 0.01. The remaining ~8% of errors all sit in that band. Use a
-   cross-encoder reranker (e.g. `bge-reranker-v2-m3`) or have the answering
-   LLM decide. Instruct it to reply "لا توجد معلومات ذات صلة في الوثائق"
-   when the retrieved chunks don't contain the answer. A practical setup:
-   answer above T_high, refuse below T_low, send the band between them to
-   the judge.
+5. **Decide with a cross-encoder reranker (`rerank.py`).**
+   `BAAI/bge-reranker-v2-m3` reads the question and each of the e5 top-20
+   chunks *together* and outputs a relevance score with a real zero.
+
+   | best reranker score | min | median | max |
+   |---|---|---|---|
+   | answerable (57) | 0.004 | **0.901** | 0.999 |
+   | hard negatives (12) | 0.000 | **0.003** | 0.013 |
+   | garbage (4) | 0.000 | **0.000** | 0.000 |
+
+   Garbage now scores exactly 0 (cosine: 0.78). Overall accuracy rises
+   from 91.8% to **97.3%**, and AUC from 0.973 to **0.995**. Caveats:
+   - **The threshold is low (≈0.013) and the margin is thin.** The highest
+     unanswerable question scores 0.013, and the lowest correctly
+     answered one 0.014. 16 negatives is too few to trust a threshold
+     that low, so add more hard negatives to `testset.json` before fixing
+     it for production.
+   - **Its one remaining error** is "ماذا يحدث عند حدوث عطل تقني أثناء
+     الحصة الافتراضية" (0.004). The answer exists but is worded
+     differently and sits in a long chunk. Low-scoring answerable
+     questions tend to be chunks that mix several articles with OCR
+     letterhead noise ("المملكة العربية السعودية … الرقم"). Stripping
+     repeated headers and using shorter chunks are the next things to try.
+   - **Speed:** about 20 s per question on 4 CPU cores (20 pairs, XLM-R
+     large). Production needs a GPU (tens of ms), a smaller K, or an ONNX
+     or int8 export.
+   - An LLM that answers only from the retrieved chunks, and says "لا توجد
+     معلومات ذات صلة في الوثائق" otherwise, is a further safety net. It
+     has not been tested here.
 
 ### Why every cosine is ~0.8, and what removing that does (`calibration.py`)
 
@@ -108,7 +133,7 @@ question"*. "حد السرعة على الطرق السريعة" is on-topic for
 regulation but unanswered. "عطل تقني أثناء الحصة الافتراضية" is answered
 in different words ("المشكلات التقنية الطارئة أثناء التدريس"). Closing
 that gap needs a model that reads the question and the passage
-**together**: a cross-encoder reranker or an LLM judge (step 5 above).
+**together**. The reranker in step 5 does this: speed limits on highways now scores 0.006.
 
 ### What each choice is worth (ablation, same 73 questions)
 
@@ -124,6 +149,8 @@ that gap needs a model that reads the question and the passage
   chunk text of each of the 7 documents is real Arabic.
 - Expose the **raw cosine** per hit, or apply the threshold **before**
   rank fusion. RRF scores cannot be thresholded.
+- Add a reranker stage (`bge-reranker-v2-m3`) on the top-20 hits, and
+  decide "no relevant info" on its score, not on the cosine or RRF.
 - Replace `min_score: 0.7` with a calibrated value. Start near 0.91 in
   Elastic score (cos 0.82) for e5-large with prefixes, then recalibrate
   with `evaluate.py` for whatever model Nuxeo actually uses.
@@ -138,6 +165,7 @@ that gap needs a model that reads the question and the passage
 
 ```bash
 pip install pymupdf onnxruntime tokenizers numpy requests scikit-learn
+pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install transformers sentencepiece
 apt-get install tesseract-ocr tesseract-ocr-ara
 # model (≈1.3 GB):
 mkdir -p models && curl -L https://storage.googleapis.com/qdrant-fastembed/fast-multilingual-e5-large.tar.gz | tar xz -C models
@@ -147,6 +175,7 @@ python build_index.py    # chunks + embeddings (3 variants)
 python evaluate.py       # → results_title_prefix.md
 python evaluate.py no_e5_prefix   # ablations
 python calibration.py            # anisotropy treatments → calibration.md
+python rerank.py                 # reranker stage → results_rerank.md (scores cached in data/rerank_scores.json)
 SEARCH_API_TOKEN=... python qa_live_api.py   # same test set against the live API
 ```
 
