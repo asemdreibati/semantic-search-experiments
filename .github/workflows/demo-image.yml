@@ -1,0 +1,45 @@
+# Builds the demo image (demo/Dockerfile) and publishes it to GitHub
+# Container Registry as ghcr.io/<owner>/semantic-search-demo, so the demo
+# runs with `docker compose -f demo/docker-compose.yml up` and no local build.
+name: demo-image
+
+on:
+  push:
+    branches: [main, claude/beautiful-keller-xv8s2w]
+    paths:
+      - demo/**
+      - experiment/textnorm.py
+      - experiment/testset.json
+      - experiment/data/chunks.jsonl
+      - experiment/data/live_run_2026-10-07.json
+      - .dockerignore
+      - .github/workflows/demo-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space (the image carries ~4.5 GB of models)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: demo/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/semantic-search-demo:latest
+            ghcr.io/${{ github.repository_owner }}/semantic-search-demo:${{ github.sha }}

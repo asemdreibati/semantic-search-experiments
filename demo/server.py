@@ -36,6 +36,7 @@ class Ask(BaseModel):
 def load():
     global engine
     engine = Engine()
+    engine.wait_for_es()
     if requests.get(f"{ES_URL}/{INDEX}").status_code == 404:
         engine.build_index()
 

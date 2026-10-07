@@ -52,7 +52,35 @@ Tesseract and local chunking. To get closer, put the Gemini OCR text in
 rerun `python experiment/build_index.py bge_m3 bge_m3_no_title`, and delete
 the Elasticsearch index so the server rebuilds it.
 
-## Running it
+## Running it with Docker (no Python setup)
+
+You need only Docker and about 12 GB of free disk (Elasticsearch about 2 GB,
+demo image 9.3 GB unpacked / 3.2 GB download, both models included). Leave
+**8 GB of RAM** for Docker.
+
+```bash
+# download just this file (or use it from a checkout of the repo)
+docker compose -f demo/docker-compose.yml up -d
+# open http://localhost:8000   (first start: about a minute to load the models)
+docker compose -f demo/docker-compose.yml down     # stop
+```
+
+The image `ghcr.io/asemdreibati/semantic-search-demo:latest` is built and
+published by `.github/workflows/demo-image.yml` on every push that touches
+the demo. If the repository is private, the image is too. Log in once with a
+GitHub token that has `read:packages`:
+`echo <token> | docker login ghcr.io -u <github-user> --password-stdin`.
+
+To build the image yourself instead (about 6 GB of downloads, 10–20 minutes):
+
+```bash
+docker compose -f demo/docker-compose.yml -f demo/docker-compose.build.yml up -d --build
+```
+
+Behind a corporate proxy that inspects TLS, pass its CA certificate to the
+build: `docker build --secret id=extra_ca,src=proxy-ca.crt -f demo/Dockerfile .`
+
+## Running it without Docker
 
 Requirements: Python 3.10+, Docker (for Elasticsearch), about 6 GB of RAM
 for the two models, and about 5 GB of disk for model downloads.
@@ -107,3 +135,4 @@ e.g. `python demo/qa_demo.py`, which writes `qa_demo_live_sim.txt` and
 | `index.html` | the comparison page |
 | `validate_live_sim.py` | simulation vs the real live run |
 | `qa_demo.py` | full test set through the API, live-run report layout |
+| `Dockerfile`, `docker-compose.yml`, `docker-compose.build.yml` | the container setup |

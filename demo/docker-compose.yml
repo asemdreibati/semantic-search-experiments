@@ -1,0 +1,31 @@
+# Run:   docker compose -f demo/docker-compose.yml up -d      (pulls the ready image)
+# Build locally instead: add -f demo/docker-compose.build.yml
+# Open:  http://localhost:8000      (first start: ~1 minute to load models and index)
+# Stop:  docker compose -f demo/docker-compose.yml down
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.ml.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      # don't refuse to index on a nearly full laptop disk
+      - cluster.routing.allocation.disk.threshold_enabled=false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+    ports:
+      - "127.0.0.1:9200:9200"
+
+  demo:
+    image: ${DEMO_IMAGE:-ghcr.io/asemdreibati/semantic-search-demo:latest}
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - ES_URL=http://elasticsearch:9200
+    ports:
+      - "8000:8000"

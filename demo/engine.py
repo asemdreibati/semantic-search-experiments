@@ -128,6 +128,22 @@ class Engine:
         return self.embedder.encode([normalize(t) for t in texts], batch_size=8,
                                     normalize_embeddings=True, convert_to_numpy=True).astype(np.float32)
 
+    def prepare(self):
+        """Compute and cache both chunk-vector sets (used at image build time)."""
+        self._chunk_vectors(title=True)
+        self._chunk_vectors(title=False)
+
+    def wait_for_es(self, seconds=180):
+        for _ in range(seconds // 3):
+            try:
+                if requests.get(f"{ES_URL}/_cluster/health",
+                                params={"wait_for_status": "yellow", "timeout": "3s"}).ok:
+                    return
+            except requests.ConnectionError:
+                pass
+            time.sleep(3)
+        raise RuntimeError(f"Elasticsearch not reachable at {ES_URL}")
+
     def build_index(self):
         """One Elasticsearch document per PDF, its chunks as nested vectors
         (chunk text only, no title: the plain form an ingestion pipeline stores)."""

@@ -1,0 +1,8 @@
+# Build the demo image from this repository instead of pulling it:
+#   docker compose -f demo/docker-compose.yml -f demo/docker-compose.build.yml up -d --build
+services:
+  demo:
+    image: semantic-search-demo:local
+    build:
+      context: ..
+      dockerfile: demo/Dockerfile
