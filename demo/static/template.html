@@ -1,0 +1,236 @@
+<title>البحث في الوثائق السبع</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@400;600&display=swap">
+<style>
+  /* Layout: one reading column; scoreboard, then a question picker, then the two systems side by side. */
+  :root {
+    --bg: #f3f5f7; --surface: #ffffff; --ink: #16202a; --muted: #586675; --line: #dbe1e8;
+    --accent: #1b5e7c; --accent-soft: #e2eef4;
+    --good: #1d7342; --good-soft: #e4f3ea; --bad: #b0281f; --bad-soft: #fbe9e7;
+    --expect: #fbf3dc; --mark: #fde68a;
+    --ui: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+    --doc: "Noto Naskh Arabic", "Traditional Arabic", serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f151b; --surface: #17202a; --ink: #e5ecf2; --muted: #95a3b2; --line: #28333f;
+      --accent: #74b4d4; --accent-soft: #183140; --good: #62c98d; --good-soft: #142a1d;
+      --bad: #ef8a80; --bad-soft: #321b19; --expect: #2a2614; --mark: #6a5714; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f151b; --surface: #17202a; --ink: #e5ecf2; --muted: #95a3b2; --line: #28333f;
+    --accent: #74b4d4; --accent-soft: #183140; --good: #62c98d; --good-soft: #142a1d;
+    --bad: #ef8a80; --bad-soft: #321b19; --expect: #2a2614; --mark: #6a5714; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.75 var(--ui); margin: 0; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 56px; direction: rtl; }
+  h1 { font-size: 26px; line-height: 1.3; margin: 0 0 6px; text-wrap: balance; }
+  .lead { color: var(--muted); max-width: 70ch; margin: 0 0 22px; }
+  h2 { font-size: 17px; margin: 0; }
+  .score { overflow-x: auto; margin-bottom: 26px; }
+  table { border-collapse: collapse; width: 100%; min-width: 520px; background: var(--surface);
+          border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-variant-numeric: tabular-nums; }
+  th, td { padding: 9px 14px; text-align: right; border-bottom: 1px solid var(--line); }
+  th { font-weight: 600; font-size: 13px; color: var(--muted); }
+  tr:last-child td { border-bottom: 0; }
+  td.n { white-space: nowrap; }
+  tr.r-pro td { font-weight: 600; }
+  .pct { color: var(--muted); font-weight: 400; font-size: 13px; }
+  .picker { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+  .picker input, .picker select { font: inherit; padding: 10px 12px; border: 1px solid var(--line);
+          border-radius: 10px; background: var(--surface); color: var(--ink); min-width: 0; }
+  .nav { display: flex; gap: 6px; }
+  button { font: inherit; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line);
+           background: var(--surface); color: var(--accent); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .qhead { margin: 22px 0 10px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+  .qnum { color: var(--muted); font-size: 13px; }
+  .q { font-size: 20px; font-weight: 600; line-height: 1.5; }
+  .chip { display: inline-block; font-size: 12px; padding: 2px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+  .expect { background: var(--expect); border-radius: 10px; padding: 10px 14px; }
+  .expect .doc { font-family: var(--doc); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+  @media (max-width: 820px) { .cols { grid-template-columns: 1fr; } .picker { grid-template-columns: 1fr; } }
+  .col { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
+  .how { color: var(--muted); font-size: 13px; margin: 2px 0 12px; }
+  .verdict { display: inline-block; padding: 3px 12px; border-radius: 999px; font-weight: 600; font-size: 14px; }
+  .ok { background: var(--good-soft); color: var(--good); }
+  .no { background: var(--bad-soft); color: var(--bad); }
+  .real { border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; display: grid; gap: 4px; }
+  .real .lbl { font-size: 12px; color: var(--muted); letter-spacing: .02em; }
+  .sub { font-size: 12px; color: var(--muted); letter-spacing: .02em; margin: 12px 0 2px; }
+  .hit { border-top: 1px solid var(--line); padding: 9px 0; }
+  .hit:first-of-type { border-top: 0; }
+  .t { font-weight: 600; }
+  .meta { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .bar { height: 5px; background: var(--line); border-radius: 3px; margin: 5px 0; overflow: hidden; }
+  .bar span { display: block; height: 100%; background: var(--accent); }
+  .snip { font-family: var(--doc); color: var(--muted); font-size: 14px; line-height: 1.8; }
+  .answer { border: 2px solid var(--good); background: var(--good-soft); border-radius: 12px; padding: 12px; margin-top: 12px; }
+  .passage { font-family: var(--doc); white-space: pre-wrap; font-size: 15px; line-height: 1.9; margin-top: 6px; max-height: 15em; overflow: auto; }
+  .none { border: 2px dashed var(--line); border-radius: 12px; padding: 16px; margin-top: 12px; text-align: center; }
+  .none b { font-size: 17px; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--accent); }
+  mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1px; }
+  .foot { color: var(--muted); font-size: 13px; margin-top: 28px; max-width: 80ch; display: grid; gap: 6px; }
+  .foot code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; direction: ltr; unicode-bidi: embed; }
+  @media (prefers-reduced-motion: no-preference) { .col { transition: opacity .15s; } }
+</style>
+
+<div class="wrap">
+  <h1>البحث في الوثائق السبع: الحالي مقابل المقترح</h1>
+  <p class="lead">نتائج حقيقية لـ73 سؤال اختبار. 57 سؤالاً لها إجابة في الوثائق، و16 بلا إجابة، والصحيح فيها أن يقول النظام «لا توجد معلومات ذات صلة» ولا يُرجع شيئاً.</p>
+
+  <section class="score" aria-label="النتائج">
+    <table>
+      <thead><tr><th>النظام</th><th>لها إجابة: الوثيقة الصحيحة أولاً</th><th>بلا إجابة: لم يُرجع شيئاً</th><th>الإجمالي</th></tr></thead>
+      <tbody id="board"></tbody>
+    </table>
+  </section>
+
+  <div class="picker">
+    <input id="filter" type="search" placeholder="ابحث في أسئلة الاختبار… مثلاً: هيئة الطرق" autocomplete="off">
+    <div class="nav">
+      <button id="prev" type="button" aria-label="السؤال السابق">→ السابق</button>
+      <button id="next" type="button" aria-label="السؤال التالي">التالي ←</button>
+      <button id="rnd" type="button">عشوائي</button>
+    </div>
+    <select id="list" aria-label="أسئلة الاختبار"></select>
+  </div>
+
+  <div class="qhead"><span class="qnum" id="qnum"></span><span class="q" id="q"></span><span class="chip" id="kind"></span></div>
+  <div class="expect" id="expect"></div>
+
+  <div class="cols">
+    <section class="col" aria-label="النظام الحالي">
+      <h2>النظام الحالي</h2>
+      <div class="how">bge-m3 + Elasticsearch 8.12 + استعلام Nuxeo (min_score 0.7)</div>
+      <div id="live"></div>
+    </section>
+    <section class="col" aria-label="النظام المقترح">
+      <h2>النظام المقترح</h2>
+      <div class="how">bge-m3 يجلب 10 مقاطع ← reranker يقرأ السؤال مع كل مقطع ← حد مُعاير 0.0131</div>
+      <div id="pro"></div>
+    </section>
+  </div>
+
+  <div class="foot">
+    <p>«النظام الحي الفعلي» هو تشغيل مجد على Nuxeo بتاريخ 7 أكتوبر 2026، ويحتوي على الوثيقة الأولى وعدد النتائج فقط. «المحاكاة» و«المقترح» محسوبان من الديمو نفسه (Elasticsearch 8.12 حقيقي ونفس النماذج). المحاكاة تستخدم نصاً من Tesseract، والنظام الحي يستخدم نصاً من Gemini، لذلك يختلف ترتيب الوثائق بينهما أحياناً.</p>
+    <p>حد النظام المقترح مُعاير على هذه الأسئلة نفسها، لذلك نتيجته هنا متفائلة قليلاً. التقدير لأسئلة جديدة بالتحقق المتقاطع هو 97.3%.</p>
+    <p>لتجربة أسئلة من عندك يلزم تشغيل الديمو الكامل: <code>docker compose -f demo/docker-compose.yml up -d</code></p>
+  </div>
+</div>
+
+<script>
+const DATA = __DATA__;
+const NO = "لا توجد معلومات ذات صلة في الوثائق";
+const KIND = { ans: "لها إجابة", hard: "بلا إجابة · قريبة من الموضوع", easy: "بلا إجابة · بعيدة" };
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const pass = {
+  real: d => d.doc ? d.real.top === d.doc : d.real.count === 0,
+  sim:  d => d.doc ? (d.sim[0] || {}).t === d.doc : d.sim.length === 0,
+  pro:  d => d.doc ? d.pro.ok && d.pro.a.t === d.doc : !d.pro.ok,
+};
+
+(function board() {
+  const rows = [["real", "النظام الحي الفعلي (Nuxeo)"], ["sim", "النظام الحالي (محاكاة)"], ["pro", "النظام المقترح"]];
+  const pos = DATA.filter(d => d.doc), neg = DATA.filter(d => !d.doc);
+  $("#board").innerHTML = rows.map(([k, name]) => {
+    const p = pos.filter(pass[k]).length, n = neg.filter(pass[k]).length, all = p + n;
+    return `<tr class="r-${k}"><td>${name}</td><td class="n">${p} / ${pos.length}</td><td class="n">${n} / ${neg.length}</td>
+      <td class="n">${all} / ${DATA.length} <span class="pct">(${(100 * all / DATA.length).toFixed(1)}%)</span></td></tr>`;
+  }).join("");
+})();
+
+let terms = [];
+function questionTerms(q) {
+  const stop = new Set(["في","من","على","إلى","الى","عن","مع","أو","ما","ماذا","هل","كيف","كيفية","متى","أين","هي","هو","التي","الذي","عند","بعد","قبل","بين"]);
+  return [...new Set(q.split(/[\s،؟?.,]+/).map(w => w.replace(/^(وال|بال|كال|فال|لل|ال|و)/, ""))
+    .filter(w => w.length >= 3 && !stop.has(w)))];
+}
+function mark(text) {
+  let h = esc(text);
+  for (const t of terms) h = h.split(t).join(`<mark>${t}</mark>`);
+  return h;
+}
+const verdict = ok => ok ? `<span class="verdict ok">✓ صحيح</span>` : `<span class="verdict no">✗ خطأ</span>`;
+
+function fillList(filter = "") {
+  const f = filter.trim();
+  const shown = DATA.filter(d => !f || d.q.includes(f) || (d.doc || "").includes(f));
+  $("#list").innerHTML = shown.map(d =>
+    `<option value="${d.n}">#${d.n} · ${esc(d.q)}${d.doc ? "" : "  (بلا إجابة)"}</option>`).join("") ||
+    `<option disabled>لا يوجد سؤال يطابق «${esc(f)}»</option>`;
+}
+
+function show(n) {
+  const d = DATA.find(x => x.n === n); if (!d) return;
+  try { localStorage.setItem("ssq", String(n)); } catch (e) {}
+  $("#list").value = String(n);
+  terms = questionTerms(d.q);
+  $("#qnum").textContent = `سؤال #${d.n} من ${DATA.length}`;
+  $("#q").textContent = d.q;
+  $("#kind").textContent = KIND[d.kind];
+  $("#expect").innerHTML = d.doc
+    ? `المتوقع: الإجابة في <b class="doc">«${esc(d.doc)}»</b><div class="snip">${esc(d.exp)}</div>`
+    : `المتوقع: <b>لا توجد إجابة في الوثائق</b>. الصحيح أن يقول النظام ذلك ولا يُرجع أي نتيجة.`;
+
+  // current system: real live run + simulation
+  const r = d.real, rOk = pass.real(d), sOk = pass.sim(d);
+  let h = `<div class="real"><span class="lbl">النظام الحي الفعلي (تشغيل 7 أكتوبر)</span>
+    <div>${verdict(rOk)} أرجع ${r.count} ${r.count === 1 ? "وثيقة" : "وثائق"}${r.top ? `، الأولى: <span class="t">${esc(r.top)}</span>` : ""}</div></div>`;
+  h += `<div class="sub">المحاكاة</div><div>${verdict(sOk)} أرجعت ${d.sim.length} ${d.sim.length === 1 ? "وثيقة" : "وثائق"}</div>`;
+  if (!d.sim.length) h += `<div class="none"><b>لا نتائج</b><div class="meta">لم تتجاوز أي وثيقة min_score 0.7</div></div>`;
+  d.sim.forEach((x, i) => {
+    h += `<div class="hit"><div class="t">${i + 1}. ${esc(x.t)}</div>
+      <div class="meta">درجة Elastic ${x.s.toFixed(3)} · صفحة ${esc(x.p)}</div>
+      <div class="bar"><span style="width:${Math.max(0, (x.s - 0.5) / 0.5 * 100)}%"></span></div>
+      <div class="snip">${mark(x.x)}</div></div>`;
+  });
+  $("#live").innerHTML = h;
+
+  // proposed system
+  const p = d.pro;
+  h = verdict(pass.pro(d));
+  if (p.ok) {
+    h += `<div class="answer"><div class="t">${esc(p.a.t)}</div>
+      <div class="meta">صفحة ${esc(p.a.p)} · درجة الصلة ${p.a.s.toFixed(4)}</div>
+      <div class="passage">${mark(p.a.x)}</div></div>`;
+  } else {
+    h += `<div class="none"><b>${NO}</b><div class="meta">أعلى درجة صلة ${p.best.toFixed(4)}، أقل من الحد 0.0131</div></div>`;
+  }
+  h += `<details><summary>المقاطع التي قرأها الـreranker (أعلى 5)</summary>` + p.c.map((c, i) =>
+    `<div class="hit"><div class="t">${i + 1}. ${esc(c.t)} · ص ${esc(c.p)}</div>
+     <div class="bar"><span style="width:${c.s * 100}%"></span></div>
+     <div class="meta">درجة الصلة ${c.s.toFixed(4)}</div><div class="snip">${mark(c.x)}</div></div>`).join("") + `</details>`;
+  $("#pro").innerHTML = h;
+
+  const box = document.querySelector("#pro .passage");
+  const m = box && box.querySelector("mark");
+  if (m) box.scrollTop = Math.max(0, m.offsetTop - box.offsetTop - 24);
+}
+
+const visible = () => [...$("#list").options].map(o => +o.value).filter(Boolean);
+function step(k) {
+  const v = visible(); if (!v.length) return;
+  const i = v.indexOf(+$("#list").value);
+  show(v[(i + k + v.length) % v.length]);
+}
+$("#list").onchange = () => show(+$("#list").value);
+$("#prev").onclick = () => step(-1);
+$("#next").onclick = () => step(1);
+$("#rnd").onclick = () => show(DATA[Math.floor(Math.random() * DATA.length)].n);
+$("#filter").oninput = () => { fillList($("#filter").value); const v = visible(); if (v.length) show(v[0]); };
+
+fillList();
+let start = 68;
+try { const s = +localStorage.getItem("ssq"); if (s) start = s; } catch (e) {}
+show(start);
+</script>

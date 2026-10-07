@@ -52,6 +52,15 @@ Tesseract and local chunking. To get closer, put the Gemini OCR text in
 rerun `python experiment/build_index.py bge_m3 bge_m3_no_title`, and delete
 the Elasticsearch index so the server rebuilds it.
 
+## Without installing anything
+
+`demo/static/demo.html` is a single 285 KB page: open it in any browser.
+It holds the real results of all 73 test questions for the live run, the
+simulation and the proposed system, precomputed from this demo. You can't
+type new questions there; that needs the models, so use Docker below. To
+rebuild it after a change, run `python demo/static/build_static.py` with the
+demo running.
+
 ## Running it with Docker (no Python setup)
 
 You need only Docker and about 12 GB of free disk (Elasticsearch about 2 GB,
