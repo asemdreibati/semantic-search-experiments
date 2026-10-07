@@ -65,11 +65,9 @@ docker compose -f demo/docker-compose.yml up -d
 docker compose -f demo/docker-compose.yml down     # stop
 ```
 
-The image `ghcr.io/asemdreibati/semantic-search-demo:latest` is built and
-published by `.github/workflows/demo-image.yml` on every push that touches
-the demo. If the repository is private, the image is too. Log in once with a
-GitHub token that has `read:packages`:
-`echo <token> | docker login ghcr.io -u <github-user> --password-stdin`.
+The image `ghcr.io/asemdreibati/semantic-search-demo:latest` is public, so no
+login is needed. `.github/workflows/demo-image.yml` rebuilds and republishes
+it on every push that touches the demo.
 
 To build the image yourself instead (about 6 GB of downloads, 10–20 minutes):
 
