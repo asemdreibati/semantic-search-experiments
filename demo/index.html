@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>البحث الدلالي: الحالي مقابل المقترح</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --ink: #1c2330; --muted: #5d6675; --line: #e3e6eb;
+    --accent: #2563eb; --accent-soft: #e8efff; --good: #15803d; --good-soft: #e7f6ec;
+    --bad: #b42318; --bad-soft: #fdecea; --warn-soft: #fff6e0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --card: #1b2029; --ink: #e8ebf0; --muted: #9aa3b2; --line: #2c3340;
+      --accent: #6b9bff; --accent-soft: #1e2a44; --good: #4ade80; --good-soft: #15291d;
+      --bad: #f87171; --bad-soft: #2e1717; --warn-soft: #2b2512;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.7 "Segoe UI", Tahoma, "Noto Naskh Arabic", system-ui, sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .search { display: flex; gap: 8px; }
+  .search input { flex: 1; font: inherit; padding: 12px 14px; border: 1px solid var(--line);
+                  border-radius: 10px; background: var(--card); color: var(--ink); }
+  button { font: inherit; padding: 10px 18px; border-radius: 10px; border: 1px solid var(--accent);
+           background: var(--accent); color: #fff; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--accent); }
+  button:disabled { opacity: .5; cursor: wait; }
+  .examples { display: flex; gap: 8px; margin: 10px 0 0; flex-wrap: wrap; }
+  .examples select { flex: 1; min-width: 220px; font: inherit; padding: 8px 10px; border-radius: 10px;
+                     border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+  .expected { margin: 14px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--warn-soft);
+              display: none; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
+  @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+  .col { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-height: 160px; }
+  .col h2 { font-size: 17px; margin: 0; }
+  .col .how { color: var(--muted); font-size: 13px; margin: 2px 0 12px; }
+  .verdict { display: inline-block; padding: 4px 12px; border-radius: 999px; font-weight: 600; font-size: 14px; }
+  .v-good { background: var(--good-soft); color: var(--good); }
+  .v-bad { background: var(--bad-soft); color: var(--bad); }
+  .v-info { background: var(--accent-soft); color: var(--accent); }
+  .hit { border-top: 1px solid var(--line); padding: 10px 0; }
+  .hit:first-of-type { border-top: 0; }
+  .hit .t { font-weight: 600; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; margin: 6px 0; overflow: hidden; }
+  .bar span { display: block; height: 100%; background: var(--accent); }
+  .snip { color: var(--muted); font-size: 14px; max-height: 4.8em; overflow: hidden; }
+  .answer { border: 2px solid var(--good); background: var(--good-soft); border-radius: 12px; padding: 12px; margin-top: 12px; }
+  .noans { border: 2px dashed var(--line); border-radius: 12px; padding: 14px; margin-top: 12px; text-align: center; }
+  .noans b { font-size: 17px; }
+  .passage { white-space: pre-wrap; font-size: 14px; margin-top: 6px; max-height: 14em; overflow: auto; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--accent); }
+  .time { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .spin { color: var(--muted); }
+  .note { color: var(--muted); font-size: 13px; margin-top: 22px; }
+  mark { background: #ffe58a; color: inherit; border-radius: 3px; padding: 0 1px; }
+  @media (prefers-color-scheme: dark) { mark { background: #6b5a14; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>البحث الدلالي في الوثائق السبع</h1>
+  <p class="sub">نفس السؤال على النظامين: الحالي (محاكاة) والمقترح. اكتب أي سؤال أو اختر من أسئلة الاختبار.</p>
+
+  <form class="search" id="f">
+    <input id="q" placeholder="اكتب سؤالاً… مثلاً: من يرأس مجلس إدارة هيئة الطرق" autocomplete="off">
+    <button id="go" type="submit">ابحث</button>
+  </form>
+  <div class="examples">
+    <select id="ex"><option value="">أسئلة الاختبار (73)…</option></select>
+    <button class="ghost" id="rnd" type="button">سؤال عشوائي</button>
+  </div>
+  <div class="expected" id="expected"></div>
+
+  <div class="grid">
+    <section class="col" id="live">
+      <h2>النظام الحالي (محاكاة)</h2>
+      <div class="how">bge-m3 + Elasticsearch 8.12 + نفس استعلام Nuxeo (min_score 0.7)</div>
+      <div class="body"><span class="spin">بانتظار سؤال…</span></div>
+    </section>
+    <section class="col" id="prop">
+      <h2>النظام المقترح</h2>
+      <div class="how">bge-m3 يجلب 10 مقاطع ← reranker يقرأ السؤال مع كل مقطع ← حد مُعاير</div>
+      <div class="body"><span class="spin">بانتظار سؤال…</span></div>
+    </section>
+  </div>
+
+  <p class="note">المحاكاة تستخدم نصاً مستخرجاً بـTesseract وتقطيعاً محلياً، بينما النظام الحي يستخدم Gemini للـOCR. لذلك قد يختلف ترتيب الوثائق قليلاً عن النظام الحي، لكن منطق الاستعلام وحد min_score مطابقان.</p>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let examples = [], current = null, terms = [];
+
+// words of the question (prefixes like ال/و/لل stripped) to highlight in passages
+function questionTerms(q) {
+  const stop = new Set(["في","من","على","إلى","الى","عن","مع","أو","ما","ماذا","هل","كيف","كيفية","متى","أين","هي","هو","التي","الذي","عند","بعد","قبل","حول","بين"]);
+  return [...new Set(q.split(/[\s،؟?.,]+/).map(w => w.replace(/^(وال|بال|كال|فال|لل|ال|و)/, ""))
+    .filter(w => w.length >= 3 && !stop.has(w)))];
+}
+function mark(text) {
+  let h = esc(text);
+  for (const t of terms) h = h.replace(new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"), m => `<mark>${m}</mark>`);
+  return h;
+}
+
+fetch("/api/examples").then(r => r.json()).then(list => {
+  examples = list;
+  const groups = {answerable: "لها إجابة في الوثائق", hard_negative: "صعبة: بلا إجابة لكنها قريبة من الموضوع", easy_negative: "بعيدة: بلا إجابة"};
+  for (const [kind, label] of Object.entries(groups)) {
+    const og = document.createElement("optgroup"); og.label = label;
+    list.forEach((e, i) => { if (e.kind === kind) { const o = new Option(e.query, i); og.appendChild(o); } });
+    $("#ex").appendChild(og);
+  }
+});
+
+$("#ex").onchange = () => { if ($("#ex").value !== "") pick(examples[+$("#ex").value]); };
+$("#rnd").onclick = () => pick(examples[Math.floor(Math.random() * examples.length)]);
+$("#f").onsubmit = e => { e.preventDefault(); current = examples.find(x => x.query === $("#q").value.trim()) || null; run(); };
+
+function pick(ex) { current = ex; $("#q").value = ex.query; run(); }
+
+function showExpected() {
+  const box = $("#expected");
+  if (!current) { box.style.display = "none"; return; }
+  box.style.display = "block";
+  box.innerHTML = current.doc
+    ? `المتوقع: الإجابة في «${esc(current.doc)}» — <span class="meta">${esc(current.expected)}</span>`
+    : `المتوقع: <b>لا توجد إجابة في الوثائق</b>، والصحيح أن يقول النظام ذلك ولا يُرجع نتائج.`;
+}
+
+async function run() {
+  const q = $("#q").value.trim(); if (!q) return;
+  showExpected();
+  terms = questionTerms(q);
+  $("#go").disabled = true;
+  $("#live .body").innerHTML = $("#prop .body").innerHTML = `<span class="spin">جارٍ البحث…</span>`;
+  try {
+    const r = await fetch("/api/compare", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({query: q})});
+    const d = await r.json();
+    renderLive(d.live); renderProp(d.proposed);
+  } catch (e) {
+    $("#live .body").innerHTML = $("#prop .body").innerHTML = `<span class="v-bad verdict">خطأ: ${esc(e)}</span>`;
+  } finally { $("#go").disabled = false; }
+}
+
+function judge(topTitle, count) {
+  if (!current) return "";
+  if (current.doc) return topTitle === current.doc
+    ? `<span class="verdict v-good">✓ الوثيقة الصحيحة أولاً</span>` : `<span class="verdict v-bad">✗ ليست الوثيقة الصحيحة</span>`;
+  return count === 0 ? `<span class="verdict v-good">✓ لم يُرجع شيئاً</span>`
+                     : `<span class="verdict v-bad">✗ أرجع نتائج لسؤال لا إجابة له</span>`;
+}
+
+function renderLive(live) {
+  const n = live.hits.length;
+  let h = `<span class="verdict v-info">أرجع ${n} ${n === 1 ? "وثيقة" : "وثائق"}</span> ${judge(live.hits[0]?.title, n)}`;
+  if (!n) h += `<div class="noans"><b>لا نتائج</b><div class="meta">لم تتجاوز أي وثيقة min_score 0.7</div></div>`;
+  live.hits.forEach((x, i) => {
+    h += `<div class="hit"><div class="t">${i + 1}. ${esc(x.title)}</div>
+      <div class="meta">درجة Elastic ${x.score.toFixed(3)} (تشابه ${(2 * x.score - 1).toFixed(3)}) · صفحة ${esc(x.page)}</div>
+      <div class="bar"><span style="width:${Math.max(0, (x.score - 0.5) / 0.5 * 100)}%"></span></div>
+      <div class="snip">${mark(x.text)}</div></div>`;
+  });
+  $("#live .body").innerHTML = h + `<div class="time">${live.ms} ms</div>`;
+}
+
+function renderProp(p) {
+  let h = judge(p.answered ? p.answer.title : null, p.answered ? 1 : 0);
+  if (p.answered) {
+    const a = p.answer;
+    h += `<div class="answer"><div class="t">${esc(a.title)}</div>
+      <div class="meta">صفحة ${esc(a.page)} · درجة الصلة ${a.score.toFixed(3)} (الحد ${p.threshold})</div>
+      <div class="passage">${mark(a.text)}</div></div>`;
+  } else {
+    h += `<div class="noans"><b>${esc(p.message)}</b>
+      <div class="meta">أعلى درجة صلة ${p.best_score.toFixed(4)} — أقل من الحد ${p.threshold}</div></div>`;
+  }
+  h += `<details><summary>المقاطع التي قرأها الـreranker (أعلى 5 من 10)</summary>`;
+  p.candidates.forEach((c, i) => {
+    h += `<div class="hit"><div class="t">${i + 1}. ${esc(c.title)} · ص ${esc(c.page)}</div>
+      <div class="bar"><span style="width:${c.score * 100}%"></span></div>
+      <div class="meta">درجة الصلة ${c.score.toFixed(4)}</div><div class="snip">${mark(c.text)}</div></div>`;
+  });
+  $("#prop .body").innerHTML = h + `</details><div class="time">${p.ms} ms</div>`;
+  // scroll the answer to the part with the most highlighted words
+  const box = document.querySelector("#prop .passage");
+  if (box) {
+    const marks = [...box.querySelectorAll("mark")];
+    if (marks.length) {
+      let best = marks[0], bestN = 0;
+      for (const m of marks) { const n = marks.filter(o => Math.abs(o.offsetTop - m.offsetTop) < 60).length; if (n > bestN) { best = m; bestN = n; } }
+      box.scrollTop = best.offsetTop - box.offsetTop - 24;
+    }
+  }
+}
+</script>
+</body>
+</html>
